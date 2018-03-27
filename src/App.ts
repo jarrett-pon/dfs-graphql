@@ -1,30 +1,41 @@
 import * as express from "express";
 import * as graphqlHTTP from "express-graphql";
+import * as fs from "fs";
 import * as  graphql from "graphql";
+import * as mysql from "mysql";
 
-// Maps id to User object
-const fakeDatabase = {
-  a: {
-    id: "a",
-    name: "alice",
-  },
-  b: {
-    id: "b",
-    name: "bob",
-  },
-  c: {
-    id: "c",
-    name: "cab",
-  },
-};
+import {
+  MYSQL_HOST,
+  MYSQL_PASSWORD,
+  MYSQL_USER,
+} from "./helpers/settings";
 
-// Define the User type
-const userType = new graphql.GraphQLObjectType({
+const connection = mysql.createConnection({
+  database: "mlbstats",
+  host: MYSQL_HOST,
+  password: MYSQL_PASSWORD,
+  ssl: {
+    ca: fs.readFileSync("/etc/ssl/certs/rds-combined-ca-bundle.pem"),
+  },
+  user: MYSQL_USER,
+});
+
+connection.connect((err) => {
+  if (err) {
+    console.error("error connection: " + err.stack);
+    return;
+  }
+
+  console.log("connected as id " + connection.threadId);
+});
+
+// Define the Player type
+const playerType = new graphql.GraphQLObjectType({
   fields: {
-    id: { type: graphql.GraphQLString },
+    id: { type: graphql.GraphQLID },
     name: { type: graphql.GraphQLString },
   },
-  name: "User",
+  name: "Player",
 });
 
 // Define the Query type
@@ -33,12 +44,16 @@ const queryType = new graphql.GraphQLObjectType({
     user: {
       // `args` describes the arguments that the `user` query accepts
       args: {
-        id: { type: graphql.GraphQLString },
+        id: { type: graphql.GraphQLID },
       },
       resolve: (_, {id}) => {
-        return fakeDatabase[id];
+        return new Promise((resolve, reject) => {
+          connection.query("SELECT mlb_name FROM players WHERE id = ?", id, (error, results, fields) => {
+             resolve({ id, name: results[0].mlb_name });
+          });
+        });
       },
-      type: userType,
+      type: playerType,
     },
   },
   name: "Query",

@@ -3,6 +3,10 @@ FROM node:carbon
 RUN ["apt-get", "update"]
 RUN ["apt-get", "install", "-y", "vim"]
 
+# Add AWS RDS SSL
+COPY rds-combined-ca-bundle.crt /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
 # Create app directory
 WORKDIR /usr/src/dfs-graphql
 
